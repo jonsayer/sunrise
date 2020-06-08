@@ -1,0 +1,240 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  	<title>Random Webcam</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.3.1/css/ol.css" type="text/css">
+	<style>
+		@font-face {
+			font-family: SPINNAKER;
+			src: url(Spinnaker-Regular.ttf);
+		}
+		@font-face {
+			font-family: TWITMOJI;
+			src: url(TwitterColorEmoji-SVGinOT.ttf);
+		}
+		body {
+			margin: 0;
+			padding: 0;
+			background-color:#000;
+			color:#fff;
+			font-family:SPINNAKER,TWITMOJI;
+			overflow: hidden;
+		}
+		
+		#siteContainer {
+			width:800px;
+			height:480px;
+			background-color:#000;
+			margin:0;
+			padding:0;
+			position:absolute:
+			top:0;
+			left:0;
+			overflow:hidden;
+		}
+		#webcamContainer {
+			position: absolute;
+			top:0px;
+			left:0px;
+			max-width:800px;
+			height:480px;
+			z-index:1000;
+		}
+		#desc {
+			position:absolute;
+			bottom:0;
+			left:0;
+			z-index:1500;
+		}
+		#desc a {
+			color:#fff;
+			text-decoration:underline
+		}
+		#map {
+			height:150px;
+			width: 150px;
+			position:absolute;
+			bottom:0;
+			right:0;
+			z-index:4000
+		}
+		#settingsTrigger{
+			position:absolute;
+			top:0;
+			right:0;
+			width:50px;
+			height:50px;
+			background-image: url("iconfinder_settings_1054981.png");
+			background-position: center;
+			background-repeat: no-repeat;
+			background-size: cover;
+			cursor:pointer;
+			z-index:9000
+		}
+		#reject, #fav {
+			position:absolute;
+			cursor:pointer;
+			right:5px;
+			width:40px;
+			border-radius:20px;
+			background-color:#73c3ab;
+			color:#000;
+			height:40px;
+			font-weight:bold;
+			text-align:center;
+			font-size:25px;
+			line-height:40px;
+			z-index:4000;
+			font-family:TWITMOJI
+		}
+		#reject {
+			top:120px;
+		}
+		#fav {
+			top:70px;
+		}
+		
+		#settings {
+			padding: 0 5% 0 5%;
+			display:none;
+			width:90%;
+			height:100%;
+			background-color:#fff;
+			position:absolute;
+			top:0;
+			right:0;
+			z-index:5000;
+			color:#000;
+			font-size:90%
+		}
+		#tardis{
+			display:none;
+			width:50px;
+			height:100px;
+			position:absolute;
+			top:180px;
+			left:375px;
+			z-index:3000;
+			background-image: url("tardis.gif");
+			background-position: center;
+			background-repeat: no-repeat;
+			background-size: cover;
+		}
+		
+		input[type=range] {
+			width:400px;
+		}
+	</style>
+	
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.3.1/build/ol.js"></script>
+	<script src="ol-ext.js"></script>
+	
+	
+	<script src="scrypt.js"></script>
+	<script src="lists.js"></script>
+	<script src="favorite.js"></script>
+	<script src="rejected.js"></script>
+	
+</head>
+<body>
+	<div id="siteContainer">
+		<img src="" id="webcamContainer" />
+		<div id="tardis"></div>
+		<div id="desc">
+			<div id="webcamLocation"></div>
+			<div id="roe-two">
+				<span id="webcamcoord"></span>
+				<span id="methodResult"></span>
+			</div>
+		</div>
+		<div id="settingsTrigger"></div>
+		<div id="fav">&#128077;</div>
+		<div id="reject">&#128078;</div>
+		<div id="settings">
+			<p>
+				<b>Search Radius</b>: <em>How far (km) can the webcam be from the selected point? Further, you spend less time calling the API but will get less relevant results</em><br />
+				<input type="range" id="searchRadius" name="searchRadius" min="1" max="1000" value="150" onchange="updateTextInput(this.value,'#radiusIndicator')">
+				<span id='radiusIndicator'>150</span>
+			</p>
+			<p>
+				<b>Refresh Frequency</b>: <em>How often the page automatically gets a new webcam, in minutes</em><br />
+				<input type="range" id="refreshFrequency" name="refreshFrequency" min="1" max="30" value="9" onchange="updateTextInput(this.value,'#frequencyIndicator')">
+				<span id='frequencyIndicator'>9</span>
+			</p>
+			<p>
+				<b>Preferred Mode</b>: <em>How does it find new webcams?</em><br />
+				<select name="mode" id="mode">
+					<option value="4" selected>Sunrise - the webcam is currently experiencing sunrise (default)</option>
+					<option value="3">Terminator - on the edge of day and night</option>
+					<option value="2">Random</option>
+					<option value="1">Favorites (from your saved list)</option>
+					<option value="0">Iconic views</option>
+				</select>
+			</p>
+			<p>
+				<b>Auto Degrade Rate</b>: <em>After this many random calls to the API, it will degrade the search to the next lowest level listed above (first not sunrises, but first all terminator points, then totally random, then iconic views, as there is not always a sunrise where there is a webcam!). Has no effect when you have selected a curated list.</em><br />
+				<input type="range" id="autoDegradeRate" name="autoDegradeRate" min="1" max="200" value="50" onchange="updateTextInput(this.value,'#degradeIndicator')">
+				<span id='degradeIndicator'>50</span>
+			</p>
+			<p>
+				<b>Points to remember</b>: <em>Will not repeat a webcam if it has shown in the last X webcams</em><br />
+				<input type="range" id="pointsToRemember" name="pointsToRemember" min="1" max="50" value="10" onchange="updateTextInput(this.value,'#rememberIndicator')">
+				<span id='rememberIndicator'>10</span>
+			</p>
+			<p>
+				<b>Terminator distance</b>: <em>How far is the Earth's terminator from the subsolar point in meters (actually 10018750 m, but different numbers will give different level of sunrise/darkness) </em><br />
+				<input type="range" id="terminatorDistance" name="terminatorDistance" min="1" max="20000000" value="10018750"  onchange="updateTextInput(this.value,'#terminatorIndicator')">
+				<span id='terminatorIndicator'>10218750</span>
+			</p>
+		</div>
+		<div id="map" class="map"></div>
+		
+		<script>
+		// the map must be initialized from within the body. 
+		var map = new ol.Map({
+			target: 'map',
+			layers: [
+				new ol.layer.Tile({
+					source: new ol.source.OSM()
+				})
+			],
+			controls:[],
+			view: new ol.View({
+				center: [0, 0],
+				zoom: 2
+			})
+		});
+		var pin = new ol.layer.Vector({
+			source: new ol.source.Vector({
+				features: [
+					new ol.Feature({
+						geometry: new ol.geom.Point(ol.proj.fromLonLat([0, 0]))
+					})
+				]
+			})
+		});
+		map.addLayer(pin);
+		
+		// night/day layer
+		var dayNightVector = new ol.source.DayNight({ });
+		var dayNightLayer = new ol.layer.Vector({
+			source: dayNightVector,
+			opacity: .5,
+			style: new ol.style.Style({
+				fill: new ol.style.Fill({
+					color: [0,0,0]
+				})
+			})
+		})
+		map.addLayer(dayNightLayer);
+		
+		getWebcam()
+		getNewWebcamTimeout()
+		
+		</script>
+		
+		
+	</div>
+</body>
+</html>
