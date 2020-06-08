@@ -13,9 +13,10 @@ The page is configured to run on a raspberry pi 7-inch touchscreen (because that
 
 At this point, you should be ready to just run the page in your browser. However, in order to save your favorites and such it should be running on a web server with PHP, ideally not accessible beyond localhost. 
 
-## Stuff I from around the net that makes this work
+## Stuff I from around the net that makes this work that I've included in this repository
 
-- Twitter emoji font (ensures compatibility on all devices for icons): https://twemoji.twitter.com/
-- Snippaker Google Font: https://fonts.google.com/specimen/Spinnaker
-- Settings icon from https://www.iconfinder.com/
+- Twitter emoji font: https://twemoji.twitter.com/
+- Sninnaker Google Font: https://fonts.google.com/specimen/Spinnaker
+- Settings icon is from https://www.iconfinder.com/
 - Tardis icon from here: https://ya-webdesign.com/imgdownload.html
+- Openlayers extensions: https://viglino.github.io/ol-ext/
