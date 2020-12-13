@@ -2,6 +2,8 @@
 
 This is a webpage for showing a random webcam from somewhere on Earth that is currently experiencing a sunrise. It is meant to just run on an extra screen or a raspberry pi as a force for connecting one to the world, a reminder that there is always a place where a new day is being born.
 
+All of the variables that decide how it finds webcams to show you can be modified by the user by clicking/tapping the settings icon in the top right. This also allows you to use modes for finding webcams other than the default mode of sunrises. 
+
 The page is configured to run fullscreen/kiosk mode on a raspberry pi 7-inch touchscreen (because that is how I am running it!) hence it looks best on a 800x480 screen or window. 
 
 *This is not meant to run on a public-facing website and is not secure enough to do so.* 
