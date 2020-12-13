@@ -7,14 +7,21 @@ var APIkey = 'YOUR API KEY';
 var localPW = 'abracadabra';
 var webRoot = 'https://api.windy.com/api/webcams/v2/';
 
+// These should be set after using the sampling software to generate sector counts for weighted random camera
+var goodCamSampleCount = 87572;
+var sectorRadius = 1000;
+
 // searchType 0 = totally random, searchType 1 = terminator, searchtype 2 = sunrise
 var searchType = 2
 
 // items are added to these lists in a seperate files
 var iconicViews 	= [];
 var excludedCoords 	= [];
+var deadzones 		= [];
+var goodcams		= [];
 var rejectedIds 	= [];
 var favoriteIds 	= [];
+var cached 			= [];
 
 var daMap;
 var camMarker;
@@ -38,13 +45,31 @@ class webcam {
 
 // returns a random point along Earth's sunrise-facing terminator
 function getRandomSunrisePoint(){
-	var northBearing = 360-(getSolarDeclination())
-	var southBearing = (getSolarDeclination())+180
-	var bearing = Math.floor(Math.random() * (northBearing - southBearing) + southBearing);
-	if(bearing > 360){
+	//var northBearing = 360-(getSolarDeclination())
+	//var southBearing = (getSolarDeclination())+180
+	var bearing = Math.floor( (Math.random() * 180) + 180);
+	/*if(bearing > 360){
 		// it is on the wintery side of the year, and we are angling a little easterly
 		bearing = bearing - 360
 	}
+	if(bearing < 0){
+		bearing = bearing + 360
+	}*/
+	return getTerminatorPoint(bearing)
+}
+
+// returns a random point along Earth's sunset-facing terminator
+function getRandomSunsetPoint(){
+	//var northBearing = 360-(getSolarDeclination())
+	//var southBearing = (getSolarDeclination())+180
+	var bearing = Math.floor( Math.random() * 180);
+	/*if(bearing > 360){
+		// it is on the wintery side of the year, and we are angling a little easterly
+		bearing = bearing - 360
+	}
+	if(bearing < 0){
+		bearing = bearing + 360
+	}*/
 	return getTerminatorPoint(bearing)
 }
 
@@ -99,7 +124,7 @@ function getRandomTerminatorPoint(){
  *
  * Original scripts by Chris Veness
  * Taken from http://movable-type.co.uk/scripts/latlong-vincenty-direct.html and optimized / cleaned up by Mathias Bynens <http://mathiasbynens.be/>
- * Based on the Vincenty direct formula by T. Vincenty, “Direct and Inverse Solutions of Geodesics on the Ellipsoid with application of nested equations”, Survey Review, vol XXII no 176, 1975 <http://www.ngs.noaa.gov/PUBS_LIB/inverse.pdf>
+ * Based on the Vincenty direct formula by T. Vincenty, Direct and Inverse Solutions of Geodesics on the Ellipsoid with application of nested equationsï¿½, Survey Review, vol XXII no 176, 1975 <http://www.ngs.noaa.gov/PUBS_LIB/inverse.pdf>
  */
 function toRad(n) {
  return n * Math.PI / 180;
@@ -141,6 +166,33 @@ function destVincenty(lat1, lon1, brng, dist) {
      revAz = Math.atan2(sinAlpha, -tmp); // final bearing
  return [ toDeg(lat2), lon1 + toDeg(L) ];
 };
+
+
+// the following gets the distance between two lat/long points, and is adapted from here: https://stackoverflow.com/questions/35949220/how-to-calculate-the-distance-between-two-latitude-and-longitude
+
+function getDistance( testLat,testLong, rejectLat,rejectLong) {       
+	lat1 = toRad(testLat); 
+	lat2 = toRad(rejectLat); 
+	lon1 = toRad(testLong); 
+	lon2 = toRad(rejectLong);
+	latDiff = lat2-lat1;
+	lonDiff = lon2-lon1;
+	var R = 6371000; // metres
+	var p1 = lat1;
+	var p2 = lat2;
+	var dp = latDiff;
+	var ds = lonDiff;
+
+	var a = Math.sin(dp/2) * Math.sin(dp/2) +
+			Math.cos(p1) * Math.cos(p2) *
+			Math.sin(ds/2) * Math.sin(ds/2);
+	var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+	var d = R * c;
+
+	var dist = Math.acos( Math.sin(p1)*Math.sin(p2) + Math.cos(p1)*Math.cos(p2) * Math.cos(ds) ) * R;
+	return dist/1000;
+}     
 
 // End code stolen from internet
 
@@ -195,7 +247,7 @@ function getNoonLongitude(){
 
 // Generates random coordinates along the sunrise terminator, 
 // but filters out large areas where there are no webcams to save API time
-function sunriseLatLangFiltered(){
+function sunriseLatLongFiltered(){
 	var coords = getRandomSunrisePoint()
 	while (rejectCoords(coords)){
 		coords = getRandomSunrisePoint()
@@ -203,9 +255,19 @@ function sunriseLatLangFiltered(){
 	return coords;
 }
 
+// Generates random coordinates along the sunset terminator, 
+// but filters out large areas where there are no webcams to save API time
+function sunsetLatLongFiltered(){
+	var coords = getRandomSunsetPoint()
+	while (rejectCoords(coords)){
+		coords = getRandomSunsetPoint()
+	}
+	return coords;
+}
+
 // Generates random coordinates along the terminator, 
 // but filters out large areas where there are no webcams to save API time
-function terminatorLatLangFiltered(){
+function terminatorLatLongFiltered(){
 	var coords = getRandomTerminatorPoint()
 	while (rejectCoords(coords)){
 		coords = getRandomTerminatorPoint()
@@ -218,7 +280,7 @@ function terminatorLatLangFiltered(){
 /////************************************ Random Lat/Lang Generators ****************************
 
 // Generates random coordinates on earth
-function randomLatLang(){
+function randomLatLong(){
 	let lat = Math.random()*180 - 90
 	let lng = Math.random()*360 - 180
 	lat = Math.floor(lat*100) / 100
@@ -226,13 +288,94 @@ function randomLatLang(){
 	return [ lat,lng ];
 }
 
+// Generates random coordinates on the sun-facing side of earth
+function randomLatLongDaytime(){
+	var coords = randomLatLong();
+	while( itsNightTime(coords) ){
+		coords = randomLatLong();
+	}
+	return coords;
+}
+
+// same as above, filters areas that are in our reject zones
+function randomLatLongDaytimeWithRejects(){
+	var coords = randomLatLongDaytime()
+	while (rejectCoords(coords)){
+		coords = randomLatLongDaytime()
+	}
+	return coords;
+}
+
+// returns a point that is currently experiencing noon
+function randomNoon(){
+	var latitude = Math.floor(Math.random() * 180);
+	var reverse = false;
+	latitude = latitude + getSolarDeclination();
+	if(latitude < -90){
+		latitude = -90 + ( Math.abs(latitude)-90 )
+		reverse = true;
+	} else if(latitude > 90){
+		latitude = 90 - ( Math.abs(latitude)-90 )
+		reverse = true
+	}
+	return [ latitude , getNoonLongitude() ];
+}
+
+// above functions with filters for reject zones
+function randomNoonWithRejects(){
+	var coords = randomNoon()
+	while (rejectCoords(coords)){
+		coords = randomNoon()
+	}
+	return coords;
+}
+
+// Rather than a random point on earth, actually finds a random camera
+// we are saving every camera we find's location to the variable 'cached'. 
+// we are just finding one of those!
+function randomCamera(){
+	var index = Math.floor( Math.random() * cached.length );
+	//make sure the sun is up
+	while(itsNightTime( cached[index] ) ){
+		index = Math.floor( Math.random() * cached.length );
+	}
+	return cached[index]
+}
+
+// returns a camera in one of the countries with LOTS of cameras
+function randomRichPlace(){
+	//temporary
+	//pick a country from our list
+	var index = Math.floor( Math.random() * richCountries.length );
+	//make sure the sun is up
+	while(itsNightTime( richCountries[index] ) ){
+		index = Math.floor( Math.random() * richCountries.length );
+	}
+	// we have found our sector. Now get a random distance. 
+	var length = Math.floor( Math.random() * (500000) )
+	// and a random bearing
+	var angle = Math.floor( Math.random() * 360 )
+	// now get a point derived from those above
+	return destVincenty(richCountries[index][0], richCountries[index][1], angle, length);
+}
+
+
+/////************************************ Filtering functions - rejected zones! ****************************
+
+// returns true if it is night where that point is
+function itsNightTime(coords){
+	return getDistance( coords[0], coords[1], getSolarDeclination() , getNoonLongitude() ) > $('#terminatorDistance').val()/1000
+}
+
 // returns true if coords are in one of our rejected zones
 function rejectCoords(coords){
 	var returnValue = false;
-	for(var i = 0; i < excludedCoords.length; i++){
-		if( excludedCoords[i][0] > coords[0] && coords[0] > excludedCoords[i][2] && excludedCoords[i][1] > coords[1] && coords[1] > excludedCoords[i][3] ){
+	
+	for(var i = 0; i < deadzones.length; i++){
+		var distance = getDistance(coords[0],coords[1], deadzones[i][0],deadzones[i][1])
+		if( distance < 500){
 			returnValue = true
-			console.debug('had to rejct the coords '+coords+' bc they fall in the rejected zone ' +excludedCoords[i][4])
+			console.debug('Rejected '+coords+' bc close to deadzone ' + deadzones[i])
 			break
 		}
 	}
@@ -241,12 +384,14 @@ function rejectCoords(coords){
 
 // Generates random coordinates, but filters out large areas where there are no webcams to save API time
 function randomLatLangFiltered(){
-	var coords = randomLatLang()
+	var coords = randomLatLong()
 	while (rejectCoords(coords)){
-		coords = randomLatLang()
+		coords = randomLatLong()
 	}
 	return coords;
 }
+
+/////************************************ COORD mode settings ****************************
 
 // determine the method to use to get our coordinates
 function decideCoordMode(count){
@@ -269,14 +414,22 @@ function decideModeString(count){
 	} else {
 		method = decideCoordMode(count)
 		switch(method) {
-			case 4:
+			case 8:
 				return 'Sunrise';
-			case 3:
+			case 7:
+				return 'Sunset';
+			case 6:
 				return 'Terminator';
+			case 5:
+				return 'Noon';
+			case 4:
+				return 'Random Cam';
+			case 3:
+				return 'Random Point';
 			case 2:
-				return 'Random';
+				return 'Rich Countries';
 			default:
-				return 'Random'
+				return 'Unknown Method'
 		}
 	}
 }
@@ -284,12 +437,27 @@ function decideModeString(count){
 // This is controlled by all functions that actually call for a random coordinate, changes coordinate generator based on current settings
 function getFilteredCoordsByCurrentSearchType(count){
 	var method = decideCoordMode(count)
-	if(method == 4){
-		return sunriseLatLangFiltered()
+	if(method == 8){
+		// Sunrise
+		return sunriseLatLongFiltered()
+	}else if(method == 7){
+		// Sunset
+		return sunsetLatLongFiltered()
+	}else if(method == 6){
+		// terminator
+		return terminatorLatLongFiltered()
+	}else if(method == 5){
+		// noon
+		return randomNoonWithRejects()
+	} else if(method == 4){
+		// random camera from the cache 
+		return randomCamera()
 	}else if(method == 3){
-		return terminatorLatLangFiltered()
-	} else if(method == 2){
-		return randomLatLangFiltered();
+		// random lat/long
+		return randomLatLongDaytimeWithRejects();
+	}else if(method == 2){
+		// rich places  
+		return randomRichPlace()
 	} else {
 		// returning 0,0 is a known signal that means "this is not a real coordinate!"
 		return [0,0];
@@ -344,7 +512,7 @@ function getIconicOrFaveWebcam(){
 
 // retrieves data from API and builds webcam object
 function webcamQuery(lat, lng, radius){
-	let queryString = webRoot+'list/nearby='+lat+','+lng+','+radius+'?key='+APIkey+'&show=webcams:image,location;categories&orderby=distance&categories='+categories;
+	let queryString = webRoot+'list/nearby='+lat+','+lng+','+radius+'?key='+APIkey+'&show=webcams:image,location;categories&orderby=distance&'/*categories='+categories*/;
 	console.log( 'calling: ' + queryString);
 	return doWebcamQuery(queryString)
 }
@@ -492,7 +660,22 @@ async function getWebcam() {
 			showNewWebCam(webcamR,count);
 		}
 	}
-	
+}
+
+// caches webcam coordinates to file for future grabbing
+function cacheWebcam(lat,long){
+	var rId = lat+','+long
+	cached.push([lat,long])
+	console.log('sending caching request to localhost...')
+	$.ajax({
+		url: 'http://localhost/randomWebcam/modify_favs_and_rejects.php',
+		data: {"tp" : 'cached',"pw" : localPW, "id" : rId},
+		success: function(response){
+			console.log('Caching request response: '+response)
+		},
+		cache: false,
+		type: 'GET'
+	});
 }
 
 /////************************************MAP FUNCTIONS ****************************
@@ -535,6 +718,7 @@ function moveMap(lat,lng){
 }
 
 function showNewWebCam(webcamInput,tries){
+	cacheWebcam( webcamInput.lat, webcamInput.lng )
 	moveMap(webcamInput.lat,webcamInput.lng)
 	$('#webcamContainer').attr("src",webcamInput.img);
 	$('#webcamLocation').html(renderLink(webcamInput.linkypoo,webcamInput.locName));
