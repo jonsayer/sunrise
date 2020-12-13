@@ -27,7 +27,7 @@
 			background-color:#000;
 			margin:0;
 			padding:0;
-			position:absolute:
+			position:absolute;
 			top:0;
 			left:0;
 			overflow:hidden;
@@ -135,6 +135,7 @@
 	<script src="lists.js"></script>
 	<script src="favorite.js"></script>
 	<script src="rejected.js"></script>
+	<script src="cached.js"></script>
 	
 </head>
 <body>
@@ -165,9 +166,13 @@
 			<p>
 				<b>Preferred Mode</b>: <em>How does it find new webcams?</em><br />
 				<select name="mode" id="mode">
-					<option value="4" selected>Sunrise - the webcam is currently experiencing sunrise (default)</option>
-					<option value="3">Terminator - on the edge of day and night</option>
-					<option value="2">Random</option>
+					<option value="8" selected>Sunrise - the webcam is currently experiencing sunrise (default)</option>
+					<option value="7">Sunset</option>
+					<option value="6">Terminator - on the edge of day and night</option>
+					<option value="5">High noon</option>
+					<option value="4">Random camera in cache</option>
+					<option value="3">True Random Coordinates (with filters) in daylight</option>
+					<option value="2">Just Europe, NA, East Asia, ANZ, in daylight</option>
 					<option value="1">Favorites (from your saved list)</option>
 					<option value="0">Iconic views</option>
 				</select>
